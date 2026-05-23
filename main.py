@@ -1,25 +1,32 @@
-# main.py
 from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import text
+from sqlmodel import select
+from typing import List
+
+# Import your database dependency and your User model
 from database import get_session
+from models import User
 
 app = FastAPI(title="AI Academic Planner API")
 
-@app.get("/health")
-async def health_check(session: AsyncSession = Depends(get_session)):
+@app.get("/users/test-dml", response_model=List[User])
+async def test_dml_connection(session: AsyncSession = Depends(get_session)):
     """
-    Dependency Injection in action: FastAPI automatically calls get_session(),
-    passes the session to this function, and executes the `finally` cleanup block
-    after the return statement.
+    Validates SQLModel DML mapping against Prisma's DDL schema.
     """
     try:
-        # We use SQLAlchemy's 'text' construct for raw SQL execution
-        result = await session.exec(text("SELECT 1"))
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        # Log the actual error to your observability stack (e.g., Sentry/Datadog)
-        # Return a sanitized 503 to the client.
-        print(f"\n🚨 ACTUAL DATABASE ERROR: {repr(e)}\n")
-        raise HTTPException(status_code=503, detail="Database connection failed")
+        # 1. The Query Builder: Constructs the SQL statement (does not execute it yet)
+        statement = select(User).limit(5)
+        
+        # 2. Execution: Sends the query over the async network pool to PgBouncer
+        result = await session.exec(statement)
+        
+        # 3. Hydration: Parses the raw DB bytes into Python SQLModel/Pydantic objects
+        users = result.all()
+        
+        return users
     
+    except Exception as e:
+        # If there is a mapping mismatch, the Exception will tell you exactly which column/table failed.
+        print(f"CRITICAL DML FAILURE: {e}")
+        raise HTTPException(status_code=500, detail=f"Database mapping error. Check server logs.")
