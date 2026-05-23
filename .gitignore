@@ -1,0 +1,33 @@
+# =========================
+# 1. ENVIRONMENT VARIABLES (CRITICAL)
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# 2. VIRTUAL ENVIRONMENTS
+# =========================
+venv/
+env/
+.venv/
+
+# =========================
+# 3. PYTHON COMPILED FILES
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================
+# 4. OS & IDE FILES
+# =========================
+.DS_Store
+.vscode/
+.idea/
+
+# =========================
+# 5. LOGS & DATABASES
+# =========================
+*.log
+*.sqlite3
