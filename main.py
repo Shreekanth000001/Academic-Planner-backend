@@ -1,32 +1,124 @@
-from fastapi import FastAPI, Depends, HTTPException
+import hashlib
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.concurrency import run_in_threadpool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
-from typing import List
+from supabase import create_client, Client
+import uuid
 
-# Import your database dependency and your User model
+# Import your config, database session, and models
+from config import settings
 from database import get_session
-from models import User
+from models import Upload, UploadStatus, User
+from queue import enqueue_syllabus_job
+from config import settings
 
-app = FastAPI(title="AI Academic Planner API")
+router = APIRouter()
 
-@app.get("/users/test-dml", response_model=List[User])
-async def test_dml_connection(session: AsyncSession = Depends(get_session)):
+# Initialize Supabase Client
+supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
+async def verify_clerk_token(token: str) -> User:
     """
-    Validates SQLModel DML mapping against Prisma's DDL schema.
+    Mock dependency. In production, you MUST decode the Clerk JWT here,
+    query the DB for the user, and return the User object. 
+    If you accept `user_id` as a raw string from the frontend, you have an 
+    Insecure Direct Object Reference (IDOR) vulnerability.
     """
-    try:
-        # 1. The Query Builder: Constructs the SQL statement (does not execute it yet)
-        statement = select(User).limit(5)
-        
-        # 2. Execution: Sends the query over the async network pool to PgBouncer
-        result = await session.exec(statement)
-        
-        # 3. Hydration: Parses the raw DB bytes into Python SQLModel/Pydantic objects
-        users = result.all()
-        
-        return users
+    # Placeholder: Assuming the token resolved to a valid user in the DB
+    # user = await session.exec(select(User).where(User.clerk_id == decoded_id))
+    pass
+
+def upload_to_supabase_storage(bucket: str, file_path: str, file_bytes: bytes, content_type: str):
+    """
+    Synchronous wrapper for Supabase storage upload. 
+    We isolate this so we can push it to a threadpool.
+    """
+    res = supabase.storage.from_(bucket).upload(
+        path=file_path,
+        file=file_bytes,
+        file_options={"content-type": content_type}
+    )
+    return res
+
+@router.post("/uploads/syllabus", status_code=status.HTTP_202_ACCEPTED)
+async def upload_syllabus(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    # current_user: User = Depends(verify_clerk_token) # Uncomment when auth is wired
+):
+    """
+    Ingests a PDF, hashes it, uploads to Storage, and queues the DB record.
+    """
+    # 1. Validation
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Unsupported Media Type. PDF only.")
+
+    # 2. Memory-Safe File Hashing (The Idempotency Key)
+    sha256_hash = hashlib.sha256()
+    file_bytes = bytearray()
     
+    # Read in 8KB chunks to prevent RAM exhaustion
+    while chunk := await file.read(8192):
+        sha256_hash.update(chunk)
+        file_bytes.extend(chunk) # Keep in memory ONLY if files are strictly < 10MB
+        
+    file_hash = sha256_hash.hexdigest()
+    
+    # Reset file pointer if you needed to read it again via the file object
+    await file.seek(0)
+
+    # 3. Deduplication Check
+    # Is this exact file already in the database for this user?
+    # query = select(Upload).where(Upload.file_hash == file_hash, Upload.user_id == current_user.id)
+    # existing_upload = (await session.exec(query)).first()
+    # if existing_upload:
+    #     return {"message": "File already processed", "upload_id": existing_upload.id}
+
+    # 4. Storage Execution (Offloaded to threadpool to prevent blocking the event loop)
+    # Note: Use a mock UUID for user_id until Clerk is wired
+    mock_user_id = "123e4567-e89b-12d3-a456-426614174000" 
+    storage_path = f"{mock_user_id}/{file_hash}.pdf"
+    
+    try:
+        await run_in_threadpool(
+            upload_to_supabase_storage,
+            bucket="syllabi", # Make sure you created this bucket in Supabase dashboard
+            file_path=storage_path,
+            file_bytes=bytes(file_bytes),
+            content_type=file.content_type
+        )
     except Exception as e:
-        # If there is a mapping mismatch, the Exception will tell you exactly which column/table failed.
-        print(f"CRITICAL DML FAILURE: {e}")
-        raise HTTPException(status_code=500, detail=f"Database mapping error. Check server logs.")
+        print(f"Storage Error: {e}")
+        raise HTTPException(status_code=502, detail="Failed to upload file to cloud storage.")
+
+    # 5. Database Transaction
+    # The file is safely in the cloud. Now we write the 'PENDING' record.
+    # We construct the public URL (or signed URL depending on your bucket privacy settings)
+    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/syllabi/{storage_path}"
+
+    new_upload = Upload(
+        user_id=uuid.UUID(mock_user_id), # Replace with current_user.id
+        file_url=public_url,
+        file_hash=file_hash,
+        status=UploadStatus.PENDING
+    )
+
+    session.add(new_upload)
+    
+    try:
+        await session.commit()
+        await session.refresh(new_upload)
+    except Exception as e:
+        await session.rollback()
+        # In a perfect system, you would trigger a cleanup of the orphaned S3 file here.
+        raise HTTPException(status_code=500, detail="Database transaction failed.")
+
+    # 6. The Producer Handoff (The non-blocking trigger)
+    await enqueue_syllabus_job(str(new_upload.id))
+
+    return {
+        "message": "Upload accepted and queued for processing.",
+        "upload_id": new_upload.id,
+        "status": new_upload.status
+    }
