@@ -95,7 +95,7 @@ async def upload_syllabus(
         )
     except Exception as e:
         print(f"Storage Error: {e}")
-        raise HTTPException(status_code=502, detail="Failed to upload file to cloud storage.")
+        raise HTTPException(status_code=502, detail="Failed to upload file to cloud storage!")
 
     # 5. Database Transaction
     # The file is safely in the cloud. Now we write the 'PENDING' record.
@@ -123,7 +123,7 @@ async def upload_syllabus(
     await enqueue_syllabus_job(str(new_upload.id))
 
     return {
-        "message": "Upload accepted and queued for processing.",
+        "message": "Upload accepted and queued for processing!",
         "upload_id": new_upload.id,
         "status": new_upload.status
     }
