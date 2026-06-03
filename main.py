@@ -1,5 +1,6 @@
 import hashlib
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
@@ -10,9 +11,13 @@ import uuid
 from config import settings
 from database import get_session
 from models import Upload, UploadStatus, User
-from queue import enqueue_syllabus_job
+from job_queue import enqueue_syllabus_job
 from config import settings
 
+app = FastAPI(title="Academic Planner API")
+
+# 2. Your router from yesterday
+from fastapi import APIRouter, UploadFile, File, Depends
 router = APIRouter()
 
 # Initialize Supabase Client
@@ -122,3 +127,4 @@ async def upload_syllabus(
         "upload_id": new_upload.id,
         "status": new_upload.status
     }
+app.include_router(router)
