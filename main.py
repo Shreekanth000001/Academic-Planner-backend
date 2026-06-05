@@ -6,6 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from supabase import create_client, Client
 import uuid
+import os
 
 # Import your config, database session, and models
 from config import settings
@@ -80,16 +81,18 @@ async def upload_syllabus(
     # if existing_upload:
     #     return {"message": "File already processed", "upload_id": existing_upload.id}
 
-    # 4. Storage Execution (Offloaded to threadpool to prevent blocking the event loop)
-    # Note: Use a mock UUID for user_id until Clerk is wired
+    # 1. Grab the file extension (e.g., ".pdf")
+    _, ext = os.path.splitext(file.filename)
     mock_user_id = "123e4567-e89b-12d3-a456-426614174000" 
-    storage_path = f"{mock_user_id}/{file_hash}.pdf"
+    
+    # 2. Generate a perfectly unique filename
+    unique_filename = f"{uuid.uuid4()}{ext}"
     
     try:
         await run_in_threadpool(
             upload_to_supabase_storage,
             bucket="syllabi", # Make sure you created this bucket in Supabase dashboard
-            file_path=storage_path,
+            file_path=unique_filename,
             file_bytes=bytes(file_bytes),
             content_type=file.content_type
         )
@@ -100,7 +103,7 @@ async def upload_syllabus(
     # 5. Database Transaction
     # The file is safely in the cloud. Now we write the 'PENDING' record.
     # We construct the public URL (or signed URL depending on your bucket privacy settings)
-    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/syllabi/{storage_path}"
+    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/syllabi/{unique_filename}"
 
     new_upload = Upload(
         user_id=uuid.UUID(mock_user_id), # Replace with current_user.id
