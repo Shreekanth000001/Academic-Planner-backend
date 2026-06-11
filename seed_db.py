@@ -8,11 +8,11 @@ async def seed_user():
     # Using the exact async context manager we just learned about
     async with AsyncSession(engine) as session:
         # The exact ID your main.py is trying to use
-        mock_id = uuid.UUID("PASTE_YOUR_MOCK_ID_HERE") 
+        mock_id = uuid.UUID("11111111-2222-3333-4444-555555555555") 
         
         new_user = User(
             id=mock_id,
-            email="founder@bengaluru-startup.com",
+            email="critic@founder-startup.com",
             clerk_id="mock_clerk_123"
         )
         
