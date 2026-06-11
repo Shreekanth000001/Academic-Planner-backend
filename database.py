@@ -1,6 +1,5 @@
 # database.py
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from config import settings
 
@@ -22,7 +21,7 @@ engine = create_async_engine(
 # This is a Python generator. It yields a session to the incoming HTTP request,
 # and the `finally` block ensures the connection is returned to the pool even if the API crashes.
 async def get_session() -> AsyncSession:
-    async_session = sessionmaker(
+    async_session = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
     )
     async with async_session() as session:
