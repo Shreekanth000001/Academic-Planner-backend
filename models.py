@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+from sqlalchemy import Index
 
 class Base(DeclarativeBase):
     pass
@@ -40,6 +41,7 @@ class User(Base):
         onupdate=func.now())
     
     uploads: Mapped[list["Upload"]] = relationship(back_populates="user")
+    schedules: Mapped[list["Schedule"]] = relationship(back_populates="user")
 
     # def __repr__(self) -> str:
     #     return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
@@ -55,3 +57,36 @@ class Upload(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),server_default=func.now())
     
     user: Mapped["User"] = relationship(back_populates="uploads")
+    schedule:Mapped["Schedule"] = relationship(back_populates="upload")
+
+
+class Schedule(Base):
+    __tablename__="schedules"
+    id: Mapped[uuid.UUID]= mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    user_id:Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id",ondelete="CASCADE"),index=True)
+    upload_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("uploads.id",ondelete="CASCADE"),unique=True)
+    title: Mapped[str] = mapped_column(String(255))
+    exam_date:Mapped[datetime] = mapped_column(DateTime(timezone=True),server_default=func.now())
+    is_active:Mapped[bool] = mapped_column(default=True)
+    created_at:Mapped[datetime] = mapped_column(DateTime(timezone=True),server_default=func.now())
+
+    user:Mapped["User"] = relationship(back_populates="schedules")
+    upload:Mapped["Upload"] = relationship(back_populates="schedule")
+    study_tasks:Mapped[List["StudyTask"]] = relationship(back_populates="schedule")
+
+class StudyTask(Base):
+    __tablename__= "study_tasks"
+
+    __table_args__ = (
+        Index("idx_schedule_assigned_date", "schedule_id", "assigned_date"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    schedule_id:Mapped[uuid.UUID] = mapped_column(ForeignKey("schedules.id",ondelete="CASCADE"))
+    topic_name: Mapped[str] = mapped_column(String(255))
+    assigned_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    order_index: Mapped[int] 
+    estimated_minutes: Mapped[int]
+    is_complete: Mapped[bool] = mapped_column(default=False)
+
+    schedule: Mapped["Schedule"] = relationship(back_populates="study_tasks")
