@@ -6,6 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
 import uuid
+from datetime import date
 
 # Re-use your database engine and models
 from database import engine 

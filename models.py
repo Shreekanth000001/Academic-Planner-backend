@@ -87,6 +87,6 @@ class StudyTask(Base):
     assigned_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     order_index: Mapped[int] 
     estimated_minutes: Mapped[int]
-    is_complete: Mapped[bool] = mapped_column(default=False)
+    is_completed: Mapped[bool] = mapped_column(default=False)
 
     schedule: Mapped["Schedule"] = relationship(back_populates="study_tasks")

@@ -7,6 +7,8 @@ from sqlmodel import select
 from supabase import create_client, Client
 import uuid
 import os
+from contextlib import asynccontextmanager
+from job_queue import init_redis, close_redis
 
 # Import your config, database session, and models
 from config import settings
@@ -15,7 +17,20 @@ from models import Upload, UploadStatus, User
 from job_queue import enqueue_syllabus_job
 from config import settings
 
-app = FastAPI(title="Academic Planner API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP LOGIC ---
+    print("Booting up: Initializing Redis Connection Pool...")
+    await init_redis()
+    
+    yield # This tells FastAPI: "Go ahead and accept web traffic now!"
+    
+    # --- SHUTDOWN LOGIC ---
+    print("Shutting down: Closing Redis connections...")
+    await close_redis()
+
+# Pass the lifespan function into the FastAPI instance
+app = FastAPI(title="Academic Planner API", lifespan=lifespan)
 
 # 2. Your router from yesterday
 from fastapi import APIRouter, UploadFile, File, Depends
@@ -83,7 +98,7 @@ async def upload_syllabus(
 
     # 1. Grab the file extension (e.g., ".pdf")
     _, ext = os.path.splitext(file.filename)
-    mock_user_id = "123e4567-e89b-12d3-a456-426614174000" 
+    mock_user_id = "11111111-2222-3333-4444-555555555555" 
     
     # 2. Generate a perfectly unique filename
     unique_filename = f"{uuid.uuid4()}{ext}"
