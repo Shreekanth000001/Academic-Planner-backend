@@ -2,8 +2,8 @@
 import asyncio
 from arq import worker
 from arq.connections import RedisSettings
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 import uuid
 from datetime import date
