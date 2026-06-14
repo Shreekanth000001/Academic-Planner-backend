@@ -1,39 +1,31 @@
+import uuid
+import os
 import hashlib
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from supabase import create_client, Client
-import uuid
-import os
-from contextlib import asynccontextmanager
-from job_queue import init_redis, close_redis
 
-# Import your config, database session, and models
 from config import settings
 from database import get_session
 from models import Upload, UploadStatus, User
-from job_queue import enqueue_syllabus_job
-from config import settings
+from job_queue import init_redis, close_redis, enqueue_syllabus_job
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- STARTUP LOGIC ---
     print("Booting up: Initializing Redis Connection Pool...")
     await init_redis()
     
-    yield # This tells FastAPI: "Go ahead and accept web traffic now!"
+    yield
     
-    # --- SHUTDOWN LOGIC ---
     print("Shutting down: Closing Redis connections...")
     await close_redis()
 
-# Pass the lifespan function into the FastAPI instance
 app = FastAPI(title="Academic Planner API", lifespan=lifespan)
-
-# 2. Your router from yesterday
-from fastapi import APIRouter, UploadFile, File, Depends
 router = APIRouter()
 
 # Initialize Supabase Client
