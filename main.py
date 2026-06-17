@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from supabase import create_client, Client
 
 from config import settings
