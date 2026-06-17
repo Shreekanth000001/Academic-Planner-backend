@@ -4,7 +4,7 @@ from arq import worker
 from arq.connections import RedisSettings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 import uuid
 from datetime import date
 
@@ -18,7 +18,7 @@ async def startup(ctx):
     We inject dependencies into the context dictionary (ctx).
     """
     # Define an independent session factory for the worker process
-    ctx["session_factory"] = sessionmaker(
+    ctx["session_factory"] = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
     )
     print("Background worker initialized successfully.")
