@@ -14,7 +14,7 @@ async def close_redis():
     if redis_pool:
         await redis_pool.close()
 
-async def enqueue_syllabus_upload(upload_id:str):
+async def enqueue_syllabus_job(upload_id:str):
     if redis_pool is None:
         raise RuntimeError("FATAL: Redis memory buffer is offline. Cannot queue task.")
     
