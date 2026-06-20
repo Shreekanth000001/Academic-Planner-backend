@@ -1,6 +1,7 @@
 # worker.py
 import uuid
-from datetime import date
+from datetime import date,datetime
+import fitz
 
 from arq import worker
 from arq.connections import RedisSettings
@@ -8,24 +9,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from supabase import create_client, Client
+from sqlalchemy import select
 
 from database import engine 
 from models import Upload, UploadStatus, Schedule, StudyTask, PlanType, User
 from config import settings
 
 async def startup(ctx):
-    """
-    Runs when the background worker boots up.
-    We inject dependencies into the context dictionary (ctx).
-    """
-    # Define an independent session factory for the worker process
+
     ctx["session_factory"] = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
     )
     print("Background worker initialized successfully.")
 
 async def shutdown(ctx):
-    """Runs when the worker safely terminates."""
+
     print("Background worker shutting down.")
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
@@ -33,21 +31,27 @@ supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVIC
 async def process_syllabus(ctx,upload_id: str):
     session_factory = ctx["session_factory"]
 
-    print("Processing wait bro...")
+    print("Processing wait bro...", datetime.now())
 
     async with session_factory() as session:
         try: 
-            print("inside try")
+            print("inside try",datetime.now())
             upload_uuid= uuid.UUID(upload_id)
             upload = await session.get(Upload,upload_uuid)
 
             if not upload:
                 return
-            
-            schedule = await session.get(Schedule)
 
-            if schedule:
-                 print(schedule)
+            stmt = select(Schedule).where(Schedule.upload_id == upload_uuid)
+
+            result = await session.execute(stmt)
+
+            scheduled= result.scalars().first()
+
+            
+
+            if scheduled:
+                 print("schedule:", scheduled.id , "upload: ", upload.id, "time: ", datetime.now())
             else:
                 new_schedule=Schedule(
                 user_id=upload.user_id,
@@ -81,9 +85,22 @@ async def process_syllabus(ctx,upload_id: str):
                 await session.commit()
 
 
-            file_bytes= supabase.storage.from_('syllabi').download(upload.file_url)
+            print("outside the else statement: ", datetime.now())
+            file_url = upload.file_url
+            file_id = file_url.split("syllabi/")[-1]
+            print("File id:",file_id)
+            file_bytes= supabase.storage.from_('syllabi').download(file_id)
             if file_bytes:
-                print("Downloaded i guess")
+                print("Downloaded i guess", datetime.now())
+
+                doc=fitz.open(stream=file_bytes, filetype="pdf")
+                extracted_text = ""
+
+                for page in doc:
+                    extracted_text += page.get_text() #type:ignore
+
+                print("Ectracted the pages!", datetime.now(), "\n")
+                print("time begin :", datetime.now() , "\n" , extracted_text[:100], "\ntime end : ", datetime.now())
             
         except Exception as e:
             await session.rollback()
