@@ -99,8 +99,27 @@ async def process_syllabus(ctx,upload_id: str):
                 for page in doc:
                     extracted_text += page.get_text() #type:ignore
 
-                print("Ectracted the pages!", datetime.now(), "\n")
-                print("time begin :", datetime.now() , "\n" , extracted_text[:100], "\ntime end : ", datetime.now())
+                if (extracted_text.strip()) == 0:
+                    print("Scanned pdf detected, OCR not supported yet, upload text pdf.")
+                    return
+                
+                def chunking_text(text,chunk_size=1000,overlap=200):
+                    chunks=[]
+                    start=0
+
+                    while start < len(text):
+                        end= start + chunk_size
+                        chunks.append(text[start:chunk_size])
+                        start += chunk_size - overlap
+                    return chunks
+
+                doc_chunks=chunking_text(extracted_text)
+
+
+                print("Extracted the chunks!: \n")
+                print(doc_chunks[0])
+
+                
             
         except Exception as e:
             await session.rollback()
