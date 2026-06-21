@@ -14,7 +14,7 @@ from supabase import create_client, Client
 from sqlalchemy import select
 
 from database import engine 
-from models import Upload, UploadStatus, Schedule, StudyTask, PlanType, User
+from models import Upload, UploadStatus, Schedule, StudyTask, PlanType, User, SyllabusChunks
 from config import settings
 
 async def startup(ctx):
@@ -128,6 +128,17 @@ async def process_syllabus(ctx,upload_id: str):
                     )
                 
                 vectors = [item.embedding for item in response.data]
+
+                print("Saving vectors into Supabase pgvector...")
+
+                for chunk_text,chunk_vector in zip(doc_chunks,vectors):
+                    new_memory = SyllabusChunks(
+                        upload_id = upload_uuid,
+                        text_content = chunk_text,
+                        embedding = chunk_vector
+                    )
+                    session.add(new_memory)
+                await session.commit()
 
                 print("chunks extracted!")
                 print(f"dock chunk lenght{len(doc_chunks)}")
