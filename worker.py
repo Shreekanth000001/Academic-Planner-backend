@@ -2,7 +2,9 @@
 import uuid
 from datetime import date,datetime
 import fitz
+import os
 
+from openai import AsyncOpenAI
 from arq import worker
 from arq.connections import RedisSettings
 from sqlalchemy import select
@@ -99,9 +101,14 @@ async def process_syllabus(ctx,upload_id: str):
                 for page in doc:
                     extracted_text += page.get_text() #type:ignore
 
-                if (extracted_text.strip()) == 0:
+                if len(extracted_text.strip()) == 0:
                     print("Scanned pdf detected, OCR not supported yet, upload text pdf.")
                     return
+
+                openai_client = AsyncOpenAI(
+                    base_url="https://models.inference.ai.azure.com",
+                    api_key=settings.GITHUB_PAT_TOKEN
+                            )
                 
                 def chunking_text(text,chunk_size=1000,overlap=200):
                     chunks=[]
@@ -109,26 +116,30 @@ async def process_syllabus(ctx,upload_id: str):
 
                     while start < len(text):
                         end= start + chunk_size
-                        chunks.append(text[start:chunk_size])
+                        chunks.append(text[start:end])
                         start += chunk_size - overlap
                     return chunks
 
                 doc_chunks=chunking_text(extracted_text)
 
-
-                print("Extracted the chunks!: \n")
-                print(doc_chunks[0])
-
+                response = await openai_client.embeddings.create(
+                input=doc_chunks,
+                model="text-embedding-3-small"
+                    )
                 
-            
+                vectors = [item.embedding for item in response.data]
+
+                print("chunks extracted!")
+                print(f"dock chunk lenght{len(doc_chunks)}")
+                print(f"vector lenght{len(vectors)}")
+                print(f"1st vector : {vectors[0][:5]}...")
+                print("\nThe END!")
+
         except Exception as e:
             await session.rollback()
             print("problem in arq:",e)
 
 
-
-
-# Worker Configuration Class required by ARQ's CLI
 class WorkerSettings:
     functions = [process_syllabus]
     on_startup = startup

@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY:str
+    GITHUB_PAT_TOKEN:str
 
     model_config = SettingsConfigDict(env_file=".env",extra="ignore")
 
