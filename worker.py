@@ -30,6 +30,25 @@ async def shutdown(ctx):
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
+async def process_schedule(session,doc_chunks):
+    print("gathering schedules")
+
+    system_promt="This is a syllabus planner app, user is sending syllabus, divide into 2 week schedules to study."
+
+    openai_client = AsyncOpenAI(base_url="https://models.inference.ai.azure.com",
+                        api_key=settings.GITHUB_PAT_TOKEN)
+    
+
+    await openai_client.chat.completions.create(
+        model="chatgpt-4o-latest",
+        response_format={"type":"json_object"},
+        messages=[
+            {"role":"system", "content":"Hi, i am the system"},
+            {"role":"user","content":doc_chunks}
+        ]
+    )
+
+
 async def process_syllabus(ctx,upload_id: str):
     session_factory = ctx["session_factory"]
 
@@ -50,8 +69,6 @@ async def process_syllabus(ctx,upload_id: str):
 
             scheduled= result.scalars().first()
 
-            
-
             if scheduled:
                  print("schedule:", scheduled.id , "upload: ", upload.id, "time: ", datetime.now())
             else:
@@ -60,7 +77,7 @@ async def process_syllabus(ctx,upload_id: str):
                 upload_id= upload.id,
                 title="Systems Programming Core",
                 exam_date= date.fromisoformat("2026-06-15")
-            )
+                    )
                 session.add(new_schedule)
 
                 await session.flush()
@@ -71,8 +88,8 @@ async def process_syllabus(ctx,upload_id: str):
                 llmoutput = {"tasks": [
                 {"topic_name": "Introduction to POSIX", "assigned_date": "2026-05-26", "order_index": 1, "estimated_minutes": 90},
                 {"topic_name": "Memory Management & mmap", "assigned_date": "2026-05-27", "order_index": 2, "estimated_minutes": 120}
-            ]
-            }
+                        ]
+                    }
 
                 for task in llmoutput["tasks"]:
                     new_task=StudyTask(
@@ -81,7 +98,7 @@ async def process_syllabus(ctx,upload_id: str):
                     assigned_date= date.fromisoformat(task["assigned_date"]),
                     order_index= task["order_index"],
                     estimated_minutes= task["estimated_minutes"]
-            )
+                    )
                     session.add(new_task)
 
                 await session.commit()
@@ -145,6 +162,8 @@ async def process_syllabus(ctx,upload_id: str):
                 print(f"vector lenght{len(vectors)}")
                 print(f"1st vector : {vectors[0][:5]}...")
                 print("\nThe END!")
+
+            await process_schedule(session,doc_chunks)
 
         except Exception as e:
             await session.rollback()
