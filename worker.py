@@ -112,26 +112,12 @@ async def process_syllabus(ctx,upload_id: str):
                 await session.flush()
 
                 upload.status = UploadStatus.COMPLETED
-
             
-                llmoutput = {"tasks": [
-                {"topic_name": "Introduction to POSIX", "assigned_date": "2026-05-26", "order_index": 1, "estimated_minutes": 90},
-                {"topic_name": "Memory Management & mmap", "assigned_date": "2026-05-27", "order_index": 2, "estimated_minutes": 120}
-                        ]
-                    }
+            stmt1 = select(Schedule).where(Schedule.upload_id == upload_uuid)
 
-                for task in llmoutput["tasks"]:
-                    new_task=StudyTask(
-                    schedule_id=new_schedule.id,
-                    topic_name=task["topic_name"],
-                    assigned_date= date.fromisoformat(task["assigned_date"]),
-                    order_index= task["order_index"],
-                    estimated_minutes= task["estimated_minutes"]
-                    )
-                    session.add(new_task)
+            result1 = await session.execute(stmt1)
 
-                await session.commit()
-
+            scheduled= result1.scalars().first()
 
             print("outside the else statement: ", datetime.now())
             file_url = upload.file_url
