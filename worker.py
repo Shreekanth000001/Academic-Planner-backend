@@ -3,6 +3,7 @@ import uuid
 from datetime import date,datetime
 import fitz
 import os
+import json
 
 from openai import AsyncOpenAI
 from arq import worker
@@ -30,23 +31,51 @@ async def shutdown(ctx):
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
-async def process_schedule(session,doc_chunks):
+async def process_schedule(session, schedule_id,doc_chunks):
     print("gathering schedules")
 
-    system_promt="This is a syllabus planner app, user is sending syllabus, divide into 2 week schedules to study."
+    full_text = "\n".join(doc_chunks)
+
+    system_promt = """
+    You are an academic planner. Review the provided syllabus text.
+    Break it down into individual study tasks or topics.
+    You MUST return your response as a valid JSON object with a key named "tasks", containing an array of objects.
+    Example structure:
+    {
+        "tasks": [
+            {"topic_name": "Introduction to Database Systems", "order_index": 1, "estimated_minutes": 60},
+            {"topic_name": "Relational Algebra", "order_index": 2, "estimated_minutes": 90}
+        ]
+    }"""
 
     openai_client = AsyncOpenAI(base_url="https://models.inference.ai.azure.com",
                         api_key=settings.GITHUB_PAT_TOKEN)
     
 
-    await openai_client.chat.completions.create(
-        model="chatgpt-4o-latest",
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o-mini",
         response_format={"type":"json_object"},
         messages=[
-            {"role":"system", "content":"Hi, i am the system"},
-            {"role":"user","content":doc_chunks}
+            {"role":"system", "content":system_promt},
+            {"role":"user","content":full_text}
         ]
     )
+
+    raw_json_string = response.choices[0].message.content
+
+    parsed_json = json.loads(raw_json_string) #type:ignore
+
+    for task in parsed_json.get("tasks",[]):
+        new_study_tasks = StudyTask(
+            schedule_id = schedule_id,
+            topic_name = task.get("topic_name"),
+            assigned_date = datetime.now(),
+            order_index = task.get("order_index"),
+            estimated_minutes = task.get("estimated_minutes"),
+            )
+        session.add(new_study_tasks)
+    await session.commit()
+    print(f"Successfully saved {len(parsed_json.get('tasks', []))} tasks to Supabase!")
 
 
 async def process_syllabus(ctx,upload_id: str):
@@ -163,7 +192,7 @@ async def process_syllabus(ctx,upload_id: str):
                 print(f"1st vector : {vectors[0][:5]}...")
                 print("\nThe END!")
 
-            await process_schedule(session,doc_chunks)
+            await process_schedule(session,scheduled.id,doc_chunks) #type:ignore
 
         except Exception as e:
             await session.rollback()
