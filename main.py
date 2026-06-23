@@ -6,11 +6,12 @@ import os
 from fastapi import FastAPI,UploadFile,File, Depends,status,HTTPException
 from fastapi.concurrency import run_in_threadpool 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 from supabase import create_client, Client
 
 from database import get_session
-from models import Upload,UploadStatus
+from models import Upload,UploadStatus, Schedule
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
 
@@ -42,6 +43,11 @@ def upload_syllabus_bucket(bucket:str,file_path:str, file_bytes:bytes,file_type:
     )
     return res
 
+@app.get("/schedules")
+async def get_schedules(session : AsyncSession = Depends(get_session)):
+    schedules = await session.execute(select(Schedule))
+    sched = schedules.scalars().all()
+    return sched
 
 @app.post("/uploads/syllabys",status_code=status.HTTP_202_ACCEPTED)
 async def upload_syllabus( 
