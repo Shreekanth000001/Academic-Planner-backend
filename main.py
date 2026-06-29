@@ -3,6 +3,7 @@ import uuid
 import hashlib
 import os
 
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI,UploadFile,File, Depends,status,HTTPException
 from fastapi.concurrency import run_in_threadpool 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,10 @@ from models import Upload,UploadStatus, Schedule
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
 
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",    
+]
 
 
 # class upload(BaseModel):
@@ -32,6 +37,14 @@ async def lifespan(app:FastAPI):
     await close_redis()
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,         # Allows cookie-based session transport/Auth headers if needed
+    allow_methods=["*"],            # Allows all standard HTTP methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],            # Allows all incoming headers (Content-Type, Authorization, etc.)
+)
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
