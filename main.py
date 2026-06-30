@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 from database import get_session
-from models import Upload,UploadStatus, Schedule
+from models import Upload,UploadStatus, Schedule, StudyTask
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
 
@@ -61,6 +61,12 @@ async def get_schedules(session : AsyncSession = Depends(get_session)):
     schedules = await session.execute(select(Schedule))
     sched = schedules.scalars().all()
     return sched
+
+@app.get("/viewtask")
+async def get_tasks(session: AsyncSession = Depends(get_session)):
+    tasks = await session.execute(select(StudyTask))
+    task= tasks.scalars().all()
+    return task
 
 @app.post("/uploads/syllabys",status_code=status.HTTP_202_ACCEPTED)
 async def upload_syllabus( 
