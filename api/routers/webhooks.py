@@ -4,10 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
 from models import User
+from config import settings
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 
-CLERK_WEBHOOK_SECRET = "whsec_YOUR_SECRET_HERE"
+CLERK_WEBHOOK_SECRET = settings.CLERK_WEBHOOK_SECRET
 
 @router.post("/clerk")
 async def clerk_webhook(

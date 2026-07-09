@@ -15,7 +15,7 @@ from database import get_session
 from models import Upload,UploadStatus, Schedule, StudyTask
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
-from api.routers import uploads
+from api.routers import uploads, webhooks
 
 origins = [
     "http://localhost:3000",
@@ -70,3 +70,4 @@ async def get_tasks(session: AsyncSession = Depends(get_session)):
     return task
 
 app.include_router(uploads.router)
+app.include_router(webhooks.router)
