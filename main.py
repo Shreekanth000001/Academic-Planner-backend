@@ -15,6 +15,7 @@ from database import get_session
 from models import Upload,UploadStatus, Schedule, StudyTask
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
+from api.routers import uploads
 
 origins = [
     "http://localhost:3000",
@@ -68,60 +69,4 @@ async def get_tasks(session: AsyncSession = Depends(get_session)):
     task= tasks.scalars().all()
     return task
 
-@app.post("/uploads/syllabys",status_code=status.HTTP_202_ACCEPTED)
-async def upload_syllabus( 
-    file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session)):
-
-    if(file.content_type != "application/pdf"):
-        raise HTTPException(status_code=500,detail="Expected PDF Format")
-    
-    sha256_hash=hashlib.sha256()
-    file_path= bytearray()
-
-    while chunk:= await file.read(8019):
-        sha256_hash.update(chunk)
-        file_path.extend(chunk)
-
-    _, ext= os.path.splitext(file.filename) # type: ignore
-
-    file_unique_name = f"{uuid.uuid4()}{ext}"
-    print(file_unique_name)
-
-    try:
-        await run_in_threadpool(
-            upload_syllabus_bucket,
-            bucket="syllabi",
-            file_path=file_unique_name,
-            file_bytes=bytes(file_path),
-            file_type=file.content_type
-        )
-    except Exception as e:
-        print("Exception error: ",e)
-        raise HTTPException(status_code=500,detail="unable to upload pdf")
-
-    filehash = sha256_hash.hexdigest()
-    public_url=f"{settings.SUPABASE_URL}/storage/v1/object/public/syllabi/{file_unique_name}"
-    mock_user_id = "11111111-2222-3333-4444-555555555555" 
-
-    new_upload = Upload(
-        user_id=mock_user_id,
-        file_url=public_url,
-        file_hash=filehash,
-        status=UploadStatus.COMPLETED
-    )
-
-    session.add(new_upload)
-
-    try:
-        await session.commit()
-    except Exception as e:
-        raise HTTPException(status_code=500,detail="Couldn't commit session - new upload")
-    
-    print("Uploaded new upload record")
-    await enqueue_syllabus_job(upload_id=str(new_upload.id))
-    
-
-    return {
-        "message": "Upload accepted and queued for processing!"
-    }
+app.include_router(uploads.router)
