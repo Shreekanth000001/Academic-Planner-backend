@@ -5,13 +5,13 @@ import os
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, UploadFile
-from fastapi import FastAPI,UploadFile,File, Depends,status,HTTPException
+from fastapi import FastAPI,UploadFile,File, Depends,status,HTTPException,Request
 from fastapi.concurrency import run_in_threadpool 
-from core.security import get_current_user # You will move your auth logic here
+from core.security import get_current_user
 from supabase import create_client, Client
 
 from database import get_session
-from models import Upload,UploadStatus, Schedule, StudyTask
+from models import Upload,UploadStatus, User
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
 
@@ -35,7 +35,7 @@ def upload_syllabus_bucket(bucket:str,file_path:str, file_bytes:bytes,file_type:
 @router.post("/syllabys", status_code=status.HTTP_202_ACCEPTED)
 async def upload_syllabus( 
     file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user),
+    user_id: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)):
 
     if(file.content_type != "application/pdf"):
@@ -69,7 +69,7 @@ async def upload_syllabus(
     public_url=f"{settings.SUPABASE_URL}/storage/v1/object/public/syllabi/{file_unique_name}"
 
     new_upload = Upload(
-        user_id=user_id,
+        user_id=user_id.id,
         file_url=public_url,
         file_hash=filehash,
         status=UploadStatus.COMPLETED
