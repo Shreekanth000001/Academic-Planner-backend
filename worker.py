@@ -91,6 +91,9 @@ async def process_syllabus(ctx,upload_id: str):
 
             if not upload:
                 return
+            
+            upload.status = UploadStatus.PROCESSING
+            await session.commit()
 
             stmt = select(Schedule).where(Schedule.upload_id == upload_uuid)
 
@@ -110,8 +113,6 @@ async def process_syllabus(ctx,upload_id: str):
                 session.add(new_schedule)
 
                 await session.flush()
-
-                upload.status = UploadStatus.COMPLETED
             
             stmt1 = select(Schedule).where(Schedule.upload_id == upload_uuid)
 
@@ -134,7 +135,10 @@ async def process_syllabus(ctx,upload_id: str):
                     extracted_text += page.get_text() #type:ignore
 
                 if len(extracted_text.strip()) == 0:
-                    print("Scanned pdf detected, OCR not supported yet, upload text pdf.")
+                    print("Scanned pdf detected. Halting.")
+                    upload.status = UploadStatus.FAILED
+                    upload.error_message = "Scanned PDF not supported. Please upload a text PDF."
+                    await session.commit()
                     return
 
                 openai_client = AsyncOpenAI(
@@ -180,9 +184,21 @@ async def process_syllabus(ctx,upload_id: str):
 
             await process_schedule(session,scheduled.id,doc_chunks) #type:ignore
 
+            upload.status = UploadStatus.COMPLETED
+            await session.commit()
+            print("Job fully complete. Frontend can now refresh.")
+
         except Exception as e:
             await session.rollback()
             print("problem in arq:",e)
+
+            upload_uuid= uuid.UUID(upload_id)
+
+            upload = await session.get(Upload, upload_uuid)
+            if upload:
+                upload.status = UploadStatus.FAILED
+                upload.error_message = f"AI Processing Error: {str(e)}"
+                await session.commit()
 
 
 class WorkerSettings:

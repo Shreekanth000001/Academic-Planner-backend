@@ -72,7 +72,7 @@ async def upload_syllabus(
         user_id=user_id.id,
         file_url=public_url,
         file_hash=filehash,
-        status=UploadStatus.COMPLETED
+        status=UploadStatus.PENDING
     )
 
     session.add(new_upload)
