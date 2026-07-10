@@ -55,7 +55,7 @@ async def get_schedules(session : AsyncSession = Depends(get_session)):
     return sched
 
 @app.get("/viewtask")
-async def get_tasks( schedule_id: str, # We talked about this earlier, we need to filter by schedule!
+async def get_tasks( schedule_id: str,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)):
 

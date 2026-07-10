@@ -4,31 +4,27 @@ import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import your database session and models
 from database import get_session
 from models import User
 
 token_auth_scheme = HTTPBearer()
 
-# 1. DEPENDENCY CHAINING: We inject the DB session right into the auth dependency
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(token_auth_scheme),
     session: AsyncSession = Depends(get_session)
-) -> User: # 2. We now return the actual User model, not a string!
+) -> User:
     raw_token = credentials.credentials
     
     try:
-        # (Still using unverified for local testing until we add JWKS)
         unverified_payload = jwt.decode(raw_token, options={"verify_signature": False})
         clerk_id = unverified_payload.get("sub")
         
         if not clerk_id:
             raise ValueError("Token missing 'sub' claim")
             
-        # 3. ACTUAL DATABASE EXECUTION
         stmt = select(User).where(User.clerk_id == clerk_id)
         result = await session.execute(stmt)
-        db_user = result.scalar_one_or_none() # Grabs the row, or returns None
+        db_user = result.scalar_one_or_none()
         
         if not db_user:
             raise HTTPException(
@@ -36,7 +32,7 @@ async def get_current_user(
                 detail="User identity not found in local database"
             )
             
-        return db_user # Return the full SQLAlchemy User object!
+        return db_user
 
     except HTTPException:
         raise
