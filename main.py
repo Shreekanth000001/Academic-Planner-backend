@@ -7,10 +7,11 @@ from sqlalchemy import select
 from supabase import create_client, Client
 
 from database import get_session
-from models import Schedule, StudyTask
+from models import Schedule, StudyTask, User
 from config import settings
 from job_queue import init_redis,close_redis
 from api.routers import uploads, webhooks
+from core.security import get_current_user
 
 origins = [
     "http://localhost:3000",
@@ -54,10 +55,17 @@ async def get_schedules(session : AsyncSession = Depends(get_session)):
     return sched
 
 @app.get("/viewtask")
-async def get_tasks(session: AsyncSession = Depends(get_session)):
-    tasks = await session.execute(select(StudyTask))
-    task= tasks.scalars().all()
-    return task
+async def get_tasks( schedule_id: str, # We talked about this earlier, we need to filter by schedule!
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)):
+
+    stmt = select(StudyTask).join(Schedule).where(
+        StudyTask.schedule_id == schedule_id,
+        Schedule.user_id == current_user.id
+    )
+    tasks = await session.execute(stmt)
+
+    return tasks.scalars().all()
 
 app.include_router(uploads.router)
 app.include_router(webhooks.router)
