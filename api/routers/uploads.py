@@ -4,6 +4,7 @@ import hashlib
 import os
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi import APIRouter, Depends, UploadFile
 from fastapi import FastAPI,UploadFile,File, Depends,status,HTTPException,Request
 from fastapi.concurrency import run_in_threadpool 
@@ -20,7 +21,6 @@ router = APIRouter(
     prefix="/upload",
     tags=["Uploads"]
 )
-
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
@@ -87,5 +87,24 @@ async def upload_syllabus(
     
 
     return {
-        "message": "Upload accepted and queued for processing!"
+        "message": "Upload accepted and queued for processing!",
+        "upload_id": str(new_upload.id)
     }
+
+@router.get("/{upload_id}/status")
+async def get_upload_status(
+    upload_id: str,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    stmt = select(Upload.status).where(
+        Upload.id == upload_id,
+        Upload.user_id == current_user.id
+    )
+    result = await session.execute(stmt)
+    status = result.scalar_one_or_none()
+    
+    if not status:
+        raise HTTPException(status_code=404, detail="Upload not found")
+        
+    return {"status": status.value}
