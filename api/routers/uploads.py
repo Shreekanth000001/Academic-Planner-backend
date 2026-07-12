@@ -16,7 +16,6 @@ from models import Upload,UploadStatus, User
 from config import settings
 from job_queue import init_redis,close_redis,enqueue_syllabus_job
 
-# 1. Initialize the router for this specific domain
 router = APIRouter(
     prefix="/upload",
     tags=["Uploads"]
