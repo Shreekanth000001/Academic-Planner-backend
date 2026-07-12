@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,8 +23,11 @@ async def chat_with_syllabus(
     current_user : User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
+    
+    upload_uuid = uuid.UUID(payload.upload_id)
+
     stmt = select(Upload).where(
-        Upload.id == payload.upload_id,
+        Upload.id == upload_uuid,
         Upload.user_id == current_user.id
     )
 
@@ -41,11 +46,12 @@ async def chat_with_syllabus(
     )
     question_vector = embed_response.data[0].embedding
 
+
     vector_stmt = (
         select(SyllabusChunks.text_content)
-        .where(SyllabusChunks.upload_id == [payload.upload_id])
+        .where(SyllabusChunks.upload_id == upload_uuid)
         .order_by(SyllabusChunks.embedding.cosine_distance(question_vector))
-               .limit(3)
+        .limit(3)
     )
 
     vector_result = await session.execute(vector_stmt)

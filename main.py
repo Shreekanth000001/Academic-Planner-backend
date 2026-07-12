@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from supabase import create_client, Client
@@ -10,7 +10,7 @@ from database import get_session
 from models import Schedule, StudyTask, User
 from config import settings
 from job_queue import init_redis,close_redis
-from api.routers import uploads, webhooks
+from api.routers import uploads, webhooks, chat
 from core.security import get_current_user
 
 origins = [
@@ -59,13 +59,25 @@ async def get_tasks( schedule_id: str,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)):
 
-    stmt = select(StudyTask).join(Schedule).where(
-        StudyTask.schedule_id == schedule_id,
+    stmt_sched = select(Schedule).where(
+        Schedule.id == schedule_id,
         Schedule.user_id == current_user.id
     )
-    tasks = await session.execute(stmt)
+    result_sched = await session.execute(stmt_sched)
+    schedule = result_sched.scalars().first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
 
-    return tasks.scalars().all()
+    stmt_tasks = select(StudyTask).where(StudyTask.schedule_id == schedule_id)
+    result_tasks = await session.execute(stmt_tasks)
+    tasks = result_tasks.scalars().all()
+
+    return {
+        "upload_id": str(schedule.upload_id),
+        "tasks": tasks
+    }
 
 app.include_router(uploads.router)
 app.include_router(webhooks.router)
+app.include_router(chat.router)
