@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
+import asyncio
+import uuid
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from supabase import create_client, Client
 
 from database import get_session
@@ -49,9 +51,11 @@ def upload_syllabus_bucket(bucket:str,file_path:str, file_bytes:bytes,file_type:
     return res
 
 @app.get("/schedules")
-async def get_schedules(session : AsyncSession = Depends(get_session)):
-    schedules = await session.execute(select(Schedule))
+async def get_schedules(session : AsyncSession = Depends(get_session),
+                        current_user: User = Depends(get_current_user)):
+    schedules = await session.execute(select(Schedule).where(Schedule.user_id == current_user.id))
     sched = schedules.scalars().all()
+    print(sched)
     return sched
 
 @app.get("/viewtask")
@@ -77,6 +81,25 @@ async def get_tasks( schedule_id: str,
         "upload_id": str(schedule.upload_id),
         "tasks": tasks
     }
+
+@app.delete("/schedules/{schedule_id}")
+async def get_delete(schedule_id:uuid.UUID,
+                    session:AsyncSession = Depends(get_session),
+                    current_user : User = Depends(get_current_user)):
+    stmt_schedule_delete=delete(Schedule).where(
+        Schedule.id == schedule_id,
+        Schedule.user_id == current_user.id).returning(Schedule.id)
+    
+    result = await session.execute(stmt_schedule_delete)
+    
+    deleted_id = result.scalar_one_or_none()
+
+    if not deleted_id:
+        raise HTTPException(status_code=404, detail="Schedule not found or unauthorized")
+    
+    await session.commit()
+
+    return {"msg": "Deleted successfully"}
 
 app.include_router(uploads.router)
 app.include_router(webhooks.router)
