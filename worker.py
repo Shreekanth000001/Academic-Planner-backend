@@ -36,15 +36,19 @@ async def process_schedule(session, schedule_id,doc_chunks):
 
     full_text = "\n".join(doc_chunks)
 
-    system_promt = """
+    system_prompt = """
     You are an academic planner. Review the provided syllabus text.
-    Break it down into individual study tasks or topics.
-    You MUST return your response as a valid JSON object with a key named "tasks", containing an array of objects.
+    You MUST return your response as a valid JSON object.
+    
+    Extract the name of the course and the final exam date (if available, format as YYYY-MM-DD, otherwise null).
+    Then, break the syllabus down into individual study tasks.
+    
     Example structure:
     {
+        "course_title": "AST 101: Astrobiology",
+        "exam_date": "2026-12-14",
         "tasks": [
-            {"topic_name": "Introduction to Database Systems", "order_index": 1, "estimated_minutes": 60},
-            {"topic_name": "Relational Algebra", "order_index": 2, "estimated_minutes": 90}
+            {"topic_name": "Read Chapter 1", "order_index": 1, "estimated_minutes": 60}
         ]
     }"""
 
@@ -56,7 +60,7 @@ async def process_schedule(session, schedule_id,doc_chunks):
         model="gpt-4o-mini",
         response_format={"type":"json_object"},
         messages=[
-            {"role":"system", "content":system_promt},
+            {"role":"system", "content":system_prompt},
             {"role":"user","content":full_text}
         ]
     )
@@ -65,6 +69,20 @@ async def process_schedule(session, schedule_id,doc_chunks):
 
     parsed_json = json.loads(raw_json_string) #type:ignore
 
+    extracted_title = parsed_json.get("course_title", "Untitled Syllabus")
+
+    stmt = select(Schedule).where(Schedule.id == schedule_id)
+
+    result = await session.execute(stmt)
+
+    scheduled= result.scalars().first()
+    
+    if scheduled:
+        scheduled.title = extracted_title
+        session.add(scheduled)
+    else:
+        print(f"Warning: Schedule {schedule_id} not found. Skipping title update.")
+    
     for task in parsed_json.get("tasks",[]):
         new_study_tasks = StudyTask(
             schedule_id = schedule_id,
