@@ -46,6 +46,23 @@ async def upload_syllabus(
     while chunk:= await file.read(8019):
         sha256_hash.update(chunk)
         file_path.extend(chunk)
+    
+    filehash = sha256_hash.hexdigest()
+
+    stmt = select(Upload).where(
+        Upload.file_hash == filehash,
+        Upload.user_id == user_id.id
+    )
+    result = await session.execute(stmt)
+    existing_upload = result.scalars().first()
+
+    if existing_upload:
+        print(f"File {filehash} already exists for this user. Skipping AI processing!")
+        # Return the OLD upload_id. Next.js polling will instantly see it's COMPLETED.
+        return {
+            "message": "File already processed!",
+            "upload_id": str(existing_upload.id)
+        }
 
     _, ext= os.path.splitext(file.filename) # type: ignore
 
@@ -64,7 +81,6 @@ async def upload_syllabus(
         print("Exception error: ",e)
         raise HTTPException(status_code=500,detail="unable to upload pdf")
 
-    filehash = sha256_hash.hexdigest()
     public_url=f"{settings.SUPABASE_URL}/storage/v1/object/public/syllabi/{file_unique_name}"
 
     new_upload = Upload(
