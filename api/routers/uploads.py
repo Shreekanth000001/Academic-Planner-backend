@@ -123,3 +123,25 @@ async def get_upload_status(
         raise HTTPException(status_code=404, detail="Upload not found")
         
     return {"status": status.value}
+
+@router.get("/active")
+async def get_active_upload(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    # Look for any upload that is not COMPLETED or FAILED
+    stmt = select(Upload).where(
+        Upload.user_id == current_user.id,
+        Upload.status.in_([UploadStatus.PENDING, UploadStatus.PROCESSING])
+    )
+    result = await session.execute(stmt)
+    active_upload = result.scalars().first()
+    
+    if active_upload:
+        return {
+            "has_active": True, 
+            "upload_id": str(active_upload.id),
+            "status": active_upload.status.value
+        }
+        
+    return {"has_active": False}
