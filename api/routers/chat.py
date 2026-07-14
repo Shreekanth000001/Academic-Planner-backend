@@ -40,6 +40,15 @@ async def chat_with_syllabus(
 
     search_query = payload.question
 
+    if current_user.credits_remaining < 10:
+        raise HTTPException(
+            status_code=402, 
+            detail="Insufficient credits. Please buy more to use the chat."
+        )
+
+    current_user.credits_remaining -= 10
+    session.add(current_user)
+
     openai_client = AsyncOpenAI(
         base_url="https://models.inference.ai.azure.com",
         api_key=settings.GITHUB_PAT_TOKEN
@@ -116,5 +125,6 @@ async def chat_with_syllabus(
     )
 
     final_answer = chat_response.choices[0].message.content
-
+    
+    await session.commit() 
     return {"answer": final_answer}
