@@ -40,15 +40,20 @@ async def process_schedule(session, schedule_id,doc_chunks):
     You are an academic planner. Review the provided syllabus text.
     You MUST return your response as a valid JSON object.
     
-    Extract the name of the course and the final exam date (if available, format as YYYY-MM-DD, otherwise null).
-    Then, break the syllabus down into individual study tasks.
+    Extract the course_title and exam_date.
+    Then, extract the individual study tasks. For each task, extract the assigned or recommended date (format as YYYY-MM-DD). If no specific date is mentioned, estimate a logical date based on the syllabus progression.
     
     Example structure:
     {
-        "course_title": "AST 101: Astrobiology",
+        "course_title": "AST 101",
         "exam_date": "2026-12-14",
         "tasks": [
-            {"topic_name": "Read Chapter 1", "order_index": 1, "estimated_minutes": 60}
+            {
+                "topic_name": "Read Chapter 1", 
+                "assigned_date": "2026-10-12",
+                "order_index": 1, 
+                "estimated_minutes": 60
+            }
         ]
     }"""
 
@@ -84,10 +89,22 @@ async def process_schedule(session, schedule_id,doc_chunks):
         print(f"Warning: Schedule {schedule_id} not found. Skipping title update.")
     
     for task in parsed_json.get("tasks",[]):
+        date_str = task.get("assigned_date")
+
+        try:
+            if date_str:
+                # Converts "2026-10-12" to a Python datetime object
+                task_date = datetime.fromisoformat(date_str)
+            else:
+                task_date = datetime.now()
+        except ValueError:
+            print(f"Warning: AI generated invalid date format '{date_str}'. Falling back to now.")
+            task_date = datetime.now()
+                  
         new_study_tasks = StudyTask(
             schedule_id = schedule_id,
             topic_name = task.get("topic_name"),
-            assigned_date = datetime.now(),
+            assigned_date = task_date,
             order_index = task.get("order_index"),
             estimated_minutes = task.get("estimated_minutes"),
             )
