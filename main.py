@@ -5,7 +5,7 @@ import uuid
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, desc
 from supabase import create_client, Client
 
 from database import get_session
@@ -53,7 +53,12 @@ def upload_syllabus_bucket(bucket:str,file_path:str, file_bytes:bytes,file_type:
 @app.get("/schedules")
 async def get_schedules(session : AsyncSession = Depends(get_session),
                         current_user: User = Depends(get_current_user)):
-    schedules = await session.execute(select(Schedule).where(Schedule.user_id == current_user.id))
+    stmt = (
+        select(Schedule)
+        .where(Schedule.user_id == current_user.id)
+        .order_by(desc(Schedule.created_at))
+    )
+    schedules = await session.execute(stmt)
     sched = schedules.scalars().all()
     print(sched)
     return sched
@@ -73,7 +78,7 @@ async def get_tasks( schedule_id: str,
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
 
-    stmt_tasks = select(StudyTask).where(StudyTask.schedule_id == schedule_id)
+    stmt_tasks = select(StudyTask).where(StudyTask.schedule_id == schedule_id).order_by(StudyTask.order_index.asc()) 
     result_tasks = await session.execute(stmt_tasks)
     tasks = result_tasks.scalars().all()
 
