@@ -12,7 +12,7 @@ from database import get_session
 from models import Schedule, StudyTask, User
 from config import settings
 from job_queue import init_redis,close_redis
-from api.routers import uploads, webhooks, chat
+from api.routers import uploads, webhooks, chat, billing
 from core.security import get_current_user
 
 origins = [
@@ -106,6 +106,17 @@ async def get_delete(schedule_id:uuid.UUID,
 
     return {"msg": "Deleted successfully"}
 
+@app.get("/users/me")
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user)
+):
+    return {
+        "email": current_user.email,
+        "plan_type": current_user.plan_type.value,
+        "credits_remaining": current_user.credits_remaining
+    }
+
 app.include_router(uploads.router)
 app.include_router(webhooks.router)
 app.include_router(chat.router)
+app.include_router(billing.router)
