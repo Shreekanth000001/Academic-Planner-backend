@@ -35,7 +35,12 @@ def upload_syllabus_bucket(bucket:str,file_path:str, file_bytes:bytes,file_type:
 async def upload_syllabus( 
     file: UploadFile = File(...),
     user_id: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)):
+
+    if current_user.credits_remaining <= 100:
+        raise HTTPException(
+            status_code=402, detail="Insufficient credits for upload.")
 
     if(file.content_type != "application/pdf"):
         raise HTTPException(status_code=500,detail="Expected PDF Format")
@@ -91,6 +96,9 @@ async def upload_syllabus(
     )
 
     session.add(new_upload)
+
+    current_user.credits_remaining -= 100
+    session.add(current_user) 
 
     try:
         await session.commit()
