@@ -1,0 +1,36 @@
+name: Deploy Backend to Azure Bare-Metal
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Executing Remote SSH Commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USERNAME }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            echo "Connected to Azure! Pulling latest code..."
+            
+            cd /home/academic-user/Academic-Planner-backend
+            
+            # Pull the latest changes from GitHub
+            git pull origin main
+            
+            # Activate the virtual environment and install new packages
+            source venv/bin/activate
+            pip install -r requirements.txt
+            
+            # Restart the daemons so they load the new code from RAM!
+            # (Azure 'academic-user' has passwordless sudo by default, so this works natively)
+            sudo systemctl restart fastapi
+            sudo systemctl restart arq-worker
+            
+            echo "Deployment Successful! Services Restarted."

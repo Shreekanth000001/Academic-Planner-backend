@@ -104,7 +104,7 @@ async def get_delete(schedule_id:uuid.UUID,
     
     await session.commit()
 
-    return {"msg": "Deleted successfully"}
+    return {"msg": "Schedule deleted successfully!"}
 
 @app.get("/users/me")
 async def get_current_user_profile(
