@@ -1,10 +1,11 @@
 # Academic Planner - Core API & AI Engine ⚙️
 
-> **Presentation Layer:** The Next.js web client for this system can be found [here]([https://github.com/Shreekanth000001/Academic-Planner-backend]).
+> **Presentation Layer:** The Next.js web client for this system can be found [here](https://github.com/Shreekanth000001/Academic-Planner).
 
 This repository houses the backend compute engine, vector retrieval system, and asynchronous AI pipeline for the Academic Planner platform. It is designed as a decoupled, zero-trust REST API that handles heavy LLM workloads out-of-band while maintaining eventual consistency with the frontend client.
 
-![System Architecture]([Insert Your Architecture Image URL Here])
+<img width="923" height="1024" alt="Archietecture" src="https://github.com/user-attachments/assets/9dc54b4d-68ff-45bb-b013-3ccc1dcf9c90" />
+
 
 ## 🛠 Tech Stack
 
