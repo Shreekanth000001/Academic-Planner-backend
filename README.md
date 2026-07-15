@@ -1,6 +1,6 @@
 # Academic Planner - Core API & AI Engine ⚙️
 
-> **Presentation Layer:** The Next.js web client for this system can be found [https://github.com/Shreekanth000001/Academic-Planner].
+> **Presentation Layer:** The Next.js web client for this system can be found [here]([Insert Frontend Repo Link Here]).
 
 This repository houses the backend compute engine, vector retrieval system, and asynchronous AI pipeline for the Academic Planner platform. It is designed as a decoupled, zero-trust REST API that handles heavy LLM workloads out-of-band while maintaining eventual consistency with the frontend client.
 
@@ -47,8 +47,13 @@ This backend operates on a bare-metal Linux environment to ensure unrestricted a
 
 ## 💻 Local Development Setup
 
-### 1. Environment Variables
-Create a `.env` file in the root directory:
+### 1. Prerequisites
+* Python 3.12+
+* A local Redis server running on Port `6379` (`brew install redis` or `sudo apt install redis-server`)
+
+### 2. Environment Variables
+Create a `.env` file in the root directory of the backend:
+
 ```env
 SUPABASE_URL="https://your-url.supabase.co"
 SUPABASE_SERVICE_KEY="eyJ..."
@@ -57,25 +62,31 @@ STRIPE_PRICE_ID="price_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 CLERK_WEBHOOK_SECRET="whsec_..."
 GITHUB_PAT_TOKEN="ghp_..."
+```
 
-2. Installation & Running
-Ensure you have Node.js 18+ installed.
-code
-Bash
-# Install dependencies
-npm install
+### 3. Installation
+Set up your Python virtual environment and install the dependencies.
 
-# Start the development server
-npm run dev
-The application will be available at http://localhost:3000.
-(Note: To test the full AI upload and retrieval pipeline, ensure your FastAPI backend and Redis worker are running simultaneously).
+```bash
+# 1. Create and activate the virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-The application will be available at http://localhost:3000.
-(Note: To test the full AI upload and retrieval pipeline, ensure your FastAPI backend and Redis worker are running simultaneously).
+# 2. Install required packages
+pip install -r requirements.txt
+```
 
-### Learn More
-To learn more about Next.js, take a look at the following resources:
+### 4. Running the Services
+Because the AI worker and the HTTP server are decoupled, you must run them in two separate terminal windows. Make sure your virtual environment is activated in both!
 
-[Next.js] Documentation - learn about Next.js features and API.
-[Learn Next.js] - an interactive Next.js tutorial.
-You can check out the Next.js GitHub repository - your feedback and contributions are welcome!
+**Terminal 1: The API Server**
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+**Terminal 2: The ARQ Background Worker**
+```bash
+arq worker.WorkerSettings
+```
+
+Once running, the interactive Swagger API documentation will be available at `http://127.0.0.1:8000/docs`.
